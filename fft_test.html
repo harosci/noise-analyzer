@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>Mic FFT Test</title>
+<style>
+  canvas { background: black; }
+</style>
+</head>
+<body>
+<button id="start">Start</button>
+<canvas id="canvas" width="800" height="300"></canvas>
+
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+document.getElementById("start").onclick = async () => {
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  const audioCtx = new AudioContext();
+  const source = audioCtx.createMediaStreamSource(stream);
+
+  const analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 2048;   // FFTサイズ
+  source.connect(analyser);
+
+  const buffer = new Uint8Array(analyser.frequencyBinCount);
+
+  function draw() {
+    requestAnimationFrame(draw);
+    analyser.getByteFrequencyData(buffer);
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "lime";
+
+    for (let i = 0; i < buffer.length; i++) {
+      const value = buffer[i];
+      const x = i * canvas.width / buffer.length;
+      const y = canvas.height - value;
+      ctx.fillRect(x, y, 1, value);
+    }
+  }
+  draw();
+};
+</script>
+</body>
+</html>
