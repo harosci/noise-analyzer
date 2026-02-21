@@ -9,7 +9,7 @@
 </head>
 <body>
 <button id="start">Start</button>
-<canvas id="canvas" width="800" height="300"></canvas>
+<canvas id="canvas" width="1600" height="300"></canvas>
 
 <script>
 const canvas = document.getElementById("canvas");
@@ -35,8 +35,8 @@ document.getElementById("start").onclick = async () => {
 
     for (let i = 0; i < buffer.length; i++) {
       const value = buffer[i];
-      const x = i * canvas.width / buffer.length;
-      const y = canvas.height - value;
+      const x = canvas.height - value;
+      const y = i * canvas.width / buffer.length;
       ctx.fillRect(x, y, 1, value);
     }
   }
