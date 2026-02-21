@@ -9,11 +9,53 @@
 </head>
 <body>
 <button id="start">Start</button>
-<canvas id="canvas" width="800" height="300"></canvas>
+<button id="toggle">Pause</button>
+<canvas id="canvas"></canvas>
 
 <script>
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
+
+function resize() {
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+window.addEventListener("resize", resize);
+resize();
+
+let running = true;
+const btn = document.getElementById("toggle");
+
+btn.onclick = async () => {
+  if (running) {
+    await audioContext.suspend();
+    btn.textContent = "Resume";
+  } else {
+    await audioContext.resume();
+    btn.textContent = "Pause";
+  }
+  running = !running;
+};
+
+function createAWeightingFilter(ctx) {
+  return ctx.createIIRFilter(
+    // Feedforward
+    [0.25574113, -0.51148225, 0.25574113],
+    // Feedback
+    [1, -1.69065929, 0.73248077]
+  );
+}
+
+const source = audioContext.createMediaStreamSource(stream);
+const aFilter = createAWeightingFilter(audioContext);
+const analyser = audioContext.createAnalyser();
+
+source
+  .connect(aFilter)
+  .connect(analyser);
+
+const db = 20 * Math.log10(value / 255);
+const freq = i * audioContext.sampleRate / analyser.fftSize;
 
 document.getElementById("start").onclick = async () => {
   const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -26,19 +68,39 @@ document.getElementById("start").onclick = async () => {
 
   const buffer = new Uint8Array(analyser.frequencyBinCount);
 
+function drawSpectrum(data) {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  ctx.save();
+  // 原点を右下に移動して90度回転
+  ctx.translate(canvas.width, 0);
+  ctx.rotate(Math.PI / 2);
+
+  const h = canvas.width;
+  const w = canvas.height;
+  const barHeight = w / data.length;
+
+  for (let i = 0; i < data.length; i++) {
+    const value = data[i];
+    const x = 0;
+    const y = w - i * barHeight;
+    const barWidth = (value / 255) * h;
+
+    ctx.fillRect(x, y, barWidth, barHeight);
+  }
+
+  ctx.restore();
+}
+
   function draw() {
     requestAnimationFrame(draw);
     analyser.getByteFrequencyData(buffer);
+    
+    drawSpectrum(dataArray);
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = "lime";
 
-    for (let i = 0; i < buffer.length; i++) {
-      const value = buffer[i];
-      const x = i * canvas.width / buffer.length;
-      const y = canvas.height - value;
-      ctx.fillRect(x, y, 1, value);
-    }
   }
   draw();
 };
