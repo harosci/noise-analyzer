@@ -116,7 +116,13 @@ function draw() {
 
 button.onclick = async () => {
   if (!running) {
-    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false
+      }
+  });
     audioCtx = new AudioContext();
 
     const source = audioCtx.createMediaStreamSource(stream);
