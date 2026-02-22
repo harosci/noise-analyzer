@@ -1,6 +1,6 @@
 let audioCtx, analyser, micStream;
 let running = false;
-let calibOffset = 0;
+let calibOffset = 100;
 let drawTimer = null;
 
 const canvas = document.getElementById("psdCanvas");
