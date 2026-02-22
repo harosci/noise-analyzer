@@ -51,14 +51,14 @@ async function startAudio() {
   const src = audioCtx.createMediaStreamSource(micStream);
 
   analyser = audioCtx.createAnalyser();
-  analyser.fftSize = 2048;
+  analyser.fftSize = 32768;
 
   src.connect(analyser);
 
   running = true;
   document.getElementById("startStopBtn").textContent = "Stop";
 
-  drawTimer = setInterval(drawPSD, 100);
+  drawTimer = setInterval(drawPSD, 33);
 }
 
 function stopAudio() {
