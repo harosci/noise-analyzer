@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Noise Analyzer</title>
+<link rel="stylesheet" href="style.css">
+<link rel="manifest" href="manifest.json">
+</head>
+
+<body>
+<div id="container">
+
+  <div id="statusBar">
+    <div class="statusItem">
+      <label>dBA</label>
+      <span id="dbaValue">--</span>
+    </div>
+    <div class="statusItem">
+      <label>Loudness</label>
+      <span id="loudnessValue">--</span>
+    </div>
+    <div class="statusItem">
+      <label>Sharpness</label>
+      <span id="sharpnessValue">--</span>
+    </div>
+  </div>
+
+  <div id="psdArea">
+    <canvas id="psdCanvas"></canvas>
+  </div>
+
+  <div id="controls">
+    <button id="startStopBtn">Start</button>
+    <button id="calibBtn">補正</button>
+  </div>
+
+</div>
+
+<!-- 補正ダイアログ -->
+<div id="calibDialog" class="modal">
+  <div class="modal-content">
+    <h3>マイク補正値 (dB)</h3>
+    <input type="number" id="calibInput" step="0.1">
+    <div class="modal-buttons">
+      <button id="calibOk">OK</button>
+      <button id="calibCancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script src="main.js"></script>
+</body>
+</html>
