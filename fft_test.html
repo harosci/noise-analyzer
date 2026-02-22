@@ -6,7 +6,7 @@
 <style>
   html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; }
   canvas { width: 100vw; height: 80vh; background: black; display: block; }
-  button { width: 100vw; height: 20vh; font-size: 16vh; }
+  button { width: 100vw; height: 20vh; font-size: 4em; }
 </style>
 </head>
 <body>
@@ -51,8 +51,8 @@ function drawSpectrumLog(buffer) {
     const f = i * fs / N;
     if (f < fMin || f > fMax) continue;
 
-    const amp = buffer[i] / 255;
-    const db = 20 * Math.log10(amp + 1e-6);
+    const amp = buffer[i] / 255 * 10;
+    const db = 20 * Math.log10(amp + 1e-5);
 
     const xNorm = Math.log10(f / fMin) / Math.log10(fMax / fMin);
     const yNorm = (db - dBmin) / (dBmax - dBmin);
