@@ -34,7 +34,20 @@ document.getElementById("calibCancel").onclick = () => {
 
 async function startAudio() {
   audioCtx = new AudioContext();
-  micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+  micStream = await navigator.mediaDevices.getUserMedia({
+    audio: {
+      echoCancellation: false,
+      noiseSuppression: false,
+      autoGainControl: false,
+      highpassFilter: false,
+      voiceIsolation: false,
+      googEchoCancellation: false,
+      googNoiseSuppression: false,
+      googAutoGainControl: false
+    }
+  });
+
   const src = audioCtx.createMediaStreamSource(micStream);
 
   analyser = audioCtx.createAnalyser();
