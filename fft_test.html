@@ -4,23 +4,9 @@
 <meta charset="UTF-8">
 <title>Mic FFT Test</title>
 <style>
-  html, body {
-    margin: 0;
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
-  }
-  canvas {
-    width: 100vw;
-    height: 80vh;
-    background: black;
-    display: block;
-  }
-  button {
-    width: 100vw;
-    height: 20vh;
-    font-size: 2em;
-  }
+  html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; }
+  canvas { width: 100vw; height: 80vh; background: black; display: block; }
+  button { width: 100vw; height: 20vh; font-size: 16vh; }
 </style>
 </head>
 <body>
@@ -49,23 +35,71 @@ const fMax = 10000;
 
 function drawSpectrumLog(buffer) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = "lime";
 
   const fs = audioCtx.sampleRate;
   const N = analyser.fftSize;
+
+  const fMin = 20;
+  const fMax = 10000;
+  const dBmin = -40;
+  const dBmax = 40;
+
+  // === FFT描画 ===
+  ctx.fillStyle = "lime";
 
   for (let i = 1; i < buffer.length; i++) {
     const f = i * fs / N;
     if (f < fMin || f > fMax) continue;
 
-    const xNorm =
-      Math.log10(f / fMin) / Math.log10(fMax / fMin);
+    const amp = buffer[i] / 255;
+    const db = 20 * Math.log10(amp + 1e-6);
+
+    const xNorm = Math.log10(f / fMin) / Math.log10(fMax / fMin);
+    const yNorm = (db - dBmin) / (dBmax - dBmin);
+
+    const x = xNorm * canvas.width;
+    const y = canvas.height * (1 - yNorm);
+
+    ctx.fillRect(x, y, 2, 2);
+  }
+
+  // === 周波数目盛り ===
+  ctx.strokeStyle = "#444";
+  ctx.fillStyle = "#888";
+  ctx.font = "12px sans-serif";
+
+  const freqTicks = [20, 50, 100, 200, 500, 1000, 2000, 5000, 10000];
+
+  for (const f of freqTicks) {
+    const xNorm = Math.log10(f / fMin) / Math.log10(fMax / fMin);
     const x = xNorm * canvas.width;
 
-    const v = buffer[i];
-    const h = (v / 255) * canvas.height;
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, canvas.height);
+    ctx.stroke();
 
-    ctx.fillRect(x, canvas.height - h, 2, h);
+    ctx.fillText(
+      f >= 1000 ? `${f/1000}k` : `${f}`,
+      x + 4,
+      canvas.height - 4
+    );
+  }
+
+  // === dB目盛り ===
+  ctx.strokeStyle = "#333";
+  ctx.fillStyle = "#888";
+
+  for (let db = -40; db <= 40; db += 20) {
+    const yNorm = (db - dBmin) / (dBmax - dBmin);
+    const y = canvas.height * (1 - yNorm);
+
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(canvas.width, y);
+    ctx.stroke();
+
+    ctx.fillText(`${db} dB`, 4, y - 2);
   }
 }
 
