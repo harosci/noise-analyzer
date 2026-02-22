@@ -4,45 +4,86 @@
 <meta charset="UTF-8">
 <title>Mic FFT Test</title>
 <style>
-  canvas { width:100vh; height: 90vh; background: black; }
-  button { width: 100vh; height: 10vh; }
+  body { margin: 0; }
+  canvas { width: 100vh; height: 90vh; background: black; display: block; }
+  button { width: 100vh; height: 10vh; font-size: 2em; }
 </style>
 </head>
 <body>
-<canvas id="myCanvas"></canvas><br/>
+
+<canvas id="myCanvas"></canvas>
 <button id="myStart">Start</button>
 
 <script>
 const canvas = document.getElementById("myCanvas");
 const ctx = canvas.getContext("2d");
+const button = document.getElementById("myStart");
 
-document.getElementById("myStart").onclick = async () => {
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-  const audioCtx = new AudioContext();
-  const source = audioCtx.createMediaStreamSource(stream);
+canvas.width  = window.innerWidth;
+canvas.height = window.innerHeight * 0.9;
 
-  const analyser = audioCtx.createAnalyser();
-  analyser.fftSize = 2048;   // FFTサイズ
-  source.connect(analyser);
+let audioCtx = null;
+let analyser = null;
+let buffer = null;
+let stream = null;
+let animationId = null;
+let running = false;
 
-  const buffer = new Uint8Array(analyser.frequencyBinCount);
+function draw() {
+  if (!running) return;
 
-  function draw() {
-    requestAnimationFrame(draw);
-    analyser.getByteFrequencyData(buffer);
+  analyser.getByteFrequencyData(buffer);
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "lime";
+
+  for (let i = 0; i < buffer.length; i++) {
+    const value = buffer[i];
+    const x = i * canvas.width / buffer.length;
+    const y = canvas.height - value;
+    ctx.fillRect(x, y, 1, value);
+  }
+
+  animationId = requestAnimationFrame(draw);
+}
+
+button.onclick = async () => {
+  if (!running) {
+    // === START ===
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    audioCtx = new AudioContext();
+
+    const source = audioCtx.createMediaStreamSource(stream);
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 2048;
+
+    source.connect(analyser);
+    buffer = new Uint8Array(analyser.frequencyBinCount);
+
+    running = true;
+    button.textContent = "Stop";
+    draw();
+
+  } else {
+    // === STOP ===
+    running = false;
+    cancelAnimationFrame(animationId);
+
+    if (audioCtx) {
+      await audioCtx.close();
+      audioCtx = null;
+    }
+
+    if (stream) {
+      stream.getTracks().forEach(t => t.stop());
+      stream = null;
+    }
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "lime";
-
-    for (let i = 0; i < buffer.length; i++) {
-      const value = buffer[i];
-      const x = i * canvas.width / buffer.length;
-      const y = canvas.height - value;
-      ctx.fillRect(x, y, 1, value);
-    }
+    button.textContent = "Start";
   }
-  draw();
 };
 </script>
+
 </body>
 </html>
