@@ -4,12 +4,21 @@
 <meta charset="UTF-8">
 <title>Mic FFT Test</title>
 <style>
-  canvas { background: black; }
+  canvas {
+    background: black; 
+    width: 100%;
+    height: 90%;
+  }
+  button {
+    width: 50%;
+    height: 10%;
+  }
 </style>
 </head>
 <body>
-<canvas id="canvas" width="100%" height="90%"></canvas><br/>
-<button id="start" width="100%" height="10%">Start</button>
+<canvas id="canvas"></canvas><br/>
+<button id="start">Start</button>
+<button id="start">Sop</button>
 
 <script>
 const canvas = document.getElementById("canvas");
