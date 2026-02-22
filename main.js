@@ -186,7 +186,7 @@ function calc_dBA(buffer, binHz) {
   let sum = 0;
   for (let i=0; i<buffer.length; i++) {
     const f = i * binHz;
-    if (f < 10 || f > 10000) continue;
+    if (f < 20 || f > 10000) continue;
     const A = Aweight(f);
     const dB = buffer[i] + A + calibOffset;
     sum += Math.pow(10, dB/10);
