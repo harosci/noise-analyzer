@@ -59,8 +59,9 @@ function drawSpectrumLog(buffer) {
 
     const x = xNorm * canvas.width;
     const y = canvas.height * (1 - yNorm);
+    const yBase = canvas.height;
 
-    ctx.fillRect(x, y, 2, 2);
+    ctx.fillRect(x, y, barWidth, yBase - y);
   }
 
   // === 周波数目盛り ===
