@@ -5,8 +5,8 @@
 <title>Mic FFT Test</title>
 <style>
   body { margin: 0; }
-  canvas { width: 100vh; height: 90vh; background: black; display: block; }
-  button { width: 100vh; height: 10vh; font-size: 2em; }
+  canvas { width: 100vw; height: 90vh; background: black; display: block; }
+  button { width: 100vw; height: 10vh; font-size: 2em; }
 </style>
 </head>
 <body>
@@ -18,6 +18,12 @@
 const canvas = document.getElementById("myCanvas");
 const ctx = canvas.getContext("2d");
 const button = document.getElementById("myStart");
+const maxFreq = 10000;
+const maxBin = Math.floor(maxFreq * analyser.fftSize / audioCtx.sampleRate);
+const fMin = 20;
+const fMax = 10000;
+const fs = audioCtx.sampleRate;
+const N = analyser.fftSize;
 
 canvas.width  = window.innerWidth;
 canvas.height = window.innerHeight * 0.9;
@@ -29,10 +35,29 @@ let stream = null;
 let animationId = null;
 let running = false;
 
+function drawSpectrumLog(buffer) {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "lime";
+
+  for (let i = 1; i < buffer.length; i++) {
+    const f = i * fs / N;
+    if (f < fMin || f > fMax) continue;
+
+    const xNorm =
+      Math.log10(f / fMin) / Math.log10(fMax / fMin);
+    const x = xNorm * canvas.width;
+
+    const v = buffer[i];
+    const h = (v / 255) * canvas.height;
+
+    ctx.fillRect(x, canvas.height - h, 2, h);
+  }
+}
 function draw() {
   if (!running) return;
 
   analyser.getByteFrequencyData(buffer);
+  drawSpectrumLog(buffer);
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.fillStyle = "lime";
@@ -55,7 +80,7 @@ button.onclick = async () => {
 
     const source = audioCtx.createMediaStreamSource(stream);
     analyser = audioCtx.createAnalyser();
-    analyser.fftSize = 2048;
+    analyser.fftSize = 4096;
 
     source.connect(analyser);
     buffer = new Uint8Array(analyser.frequencyBinCount);
