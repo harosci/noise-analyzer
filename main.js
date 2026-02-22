@@ -94,7 +94,7 @@ function drawPSD() {
 
   for (let i = 0; i < buffer.length; i++) {
     const f = i * binHz;
-    if (f < 10 || f > 10000) continue;
+    if (f < 20 || f > 20000) continue;
 
     const A = Aweight(f);
     const dB = buffer[i] + A + calibOffset;
@@ -119,7 +119,7 @@ function drawPSD() {
 }
 
 function freqToX(f, W) {
-  return W * (Math.log10(f) - Math.log10(10)) / (Math.log10(10000) - Math.log10(10));
+  return W * (Math.log10(f) - Math.log10(20)) / (Math.log10(20000) - Math.log10(20));
 }
 
 function dBToY(dB, H) {
@@ -130,7 +130,7 @@ function drawGrid(W, H) {
   const freqs = [
     20,30,40,50,60,70,80,90,
     100,200,300,400,500,600,700,800,900,
-    1000,2000,3000,4000,5000,6000,7000,8000,9000,10000
+    1000,2000,3000,4000,5000,6000,7000,8000,9000,10000,20000
   ];
 
   for (const f of freqs) {
@@ -147,7 +147,8 @@ function drawGrid(W, H) {
     {f:20, text:"20"},
     {f:100, text:"100"},
     {f:1000, text:"1k"},
-    {f:10000, text:"10k"}
+    {f:10000, text:"10k"},
+    {f:20000, text:"20k"}
   ];
 
   ctx.fillStyle = "white";
@@ -186,7 +187,7 @@ function calc_dBA(buffer, binHz) {
   let sum = 0;
   for (let i=0; i<buffer.length; i++) {
     const f = i * binHz;
-    if (f < 20 || f > 10000) continue;
+    if (f < 20 || f > 20000) continue;
     const A = Aweight(f);
     const dB = buffer[i] + A + calibOffset;
     sum += Math.pow(10, dB/10);
