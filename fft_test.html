@@ -46,6 +46,7 @@ function drawSpectrumLog(buffer) {
 
   // === FFT描画 ===
   ctx.fillStyle = "lime";
+  const barWidth = 2;
 
   for (let i = 1; i < buffer.length; i++) {
     const f = i * fs / N;
