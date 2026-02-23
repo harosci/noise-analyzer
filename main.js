@@ -251,7 +251,7 @@ function bark(f) {
 function calcLoudnessSharpness(barkEnergy) {
   const barkDB = barkEnergy.map(v => 10 * Math.log10(v + 1e-12));
 
-  const Nspec = barkDB.map(L => Math.pow(Math.max(0, L - 40), 0.23));
+  const Nspec = barkDB.map(L => Math.pow(Math.max(0, L - 30), 0.23));
 
   const loudness = Nspec.reduce((a,b)=>a+b, 0);
 
