@@ -2,6 +2,7 @@ let audioCtx, analyser, micStream;
 let running = false;
 let calibOffset = 110;
 let drawTimer = null;
+let lastBuffer = null;
 
 const canvas = document.getElementById("psdCanvas");
 const ctx = canvas.getContext("2d");
@@ -10,8 +11,51 @@ function resizeCanvas() {
   canvas.width = canvas.clientWidth;
   canvas.height = canvas.clientHeight;
 }
-window.addEventListener("resize", resizeCanvas);
+window.addEventListener("resize", () => {
+  resizeCanvas();
+  if (!running) {
+    drawLastFrame();
+  }
+});
 resizeCanvas();
+
+function drawLastFrame() {
+  if (!lastBuffer) return;
+
+  const W = canvas.width;
+  const H = canvas.height;
+
+  ctx.fillStyle = "black";
+  ctx.fillRect(0, 0, W, H);
+
+  drawGrid(W, H);
+
+  const sampleRate = audioCtx ? audioCtx.sampleRate : 48000;
+  const binHz = sampleRate / 32768;
+
+  ctx.strokeStyle = "#00FF00";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+
+  let first = true;
+
+  for (let i = 0; i < lastBuffer.length; i++) {
+    const f = i * binHz;
+    if (f < 20 || f > 20000) continue;
+
+    const dB = lastBuffer[i];
+    const x = freqToX(f, W);
+    const y = dBToY(dB, H);
+
+    if (first) {
+      ctx.moveTo(x, y);
+      first = false;
+    } else {
+      ctx.lineTo(x, y);
+    }
+  }
+  ctx.stroke();
+}
 
 // ------------------------------
 // Start / Stop
@@ -94,6 +138,7 @@ function drawPSD() {
 
   const buffer = new Float32Array(analyser.frequencyBinCount);
   analyser.getFloatFrequencyData(buffer);
+  lastBuffer = buffer.slice();
 
   const sampleRate = audioCtx.sampleRate;
   const binHz = sampleRate / analyser.fftSize;
