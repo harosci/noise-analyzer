@@ -178,14 +178,21 @@ function drawPSD() {
   ctx.stroke();
 
   // Loudness & Sharpness
-  const { loudness, sharpness } = calcLoudnessSharpness(barkEnergy);
+  // const { loudness, sharpness } = calcLoudnessSharpness(barkEnergy);
+  // アロー関数で包んで実行する
+  
+const timerId = setInterval(() => {
+    const res = calculateAcousticParameters(analyser);
+    document.getElementById("dbaValue").textContent = dBA.toFixed(1);
+    document.getElementById("LoudnessValue").textContent = res.loudness.toFixed(2);
+    document.getElementById("sharpnessValue").textContent = res.sharpness.toFixed(2);
+  }, 100);
 
-  document.getElementById("loudnessValue").textContent = loudness.toFixed(2);
-  document.getElementById("sharpnessValue").textContent = sharpness.toFixed(2);
-
+  // document.getElementById("loudnessValue").textContent = loudness.toFixed(2);
+  // document.getElementById("sharpnessValue").textContent = sharpness.toFixed(2);
   // dBA
-  const dBA = calc_dBA(buffer, binHz);
-  document.getElementById("dbaValue").textContent = dBA.toFixed(1);
+  // const dBA = calc_dBA(buffer, binHz);
+  // document.getElementById("dbaValue").textContent = dBA.toFixed(1);
 }
 
 // ------------------------------
@@ -256,18 +263,6 @@ function drawGrid(W, H) {
 }
 
 // ------------------------------
-// A-weighting
-// ------------------------------
-function Aweight(f) {
-  const f2 = f*f;
-  const num = 12200*12200 * f2*f2;
-  const den = (f2 + 20.6*20.6) *
-              Math.sqrt((f2 + 107.7*107.7)*(f2 + 737.9*737.9)) *
-              (f2 + 12200*12200);
-  return 2.0 + 20*Math.log10(num/den);
-}
-
-// ------------------------------
 // dBA
 // ------------------------------
 function calc_dBA(buffer, binHz) {
@@ -281,6 +276,17 @@ function calc_dBA(buffer, binHz) {
   }
   return 10 * Math.log10(sum);
 }
+// ------------------------------
+// A-weighting
+// ------------------------------
+function Aweight(f) {
+  const f2 = f*f;
+  const num = 12200*12200 * f2*f2;
+  const den = (f2 + 20.6*20.6) *
+              Math.sqrt((f2 + 107.7*107.7)*(f2 + 737.9*737.9)) *
+              (f2 + 12200*12200);
+  return 2.0 + 20*Math.log10(num/den);
+}
 
 // ------------------------------
 // Bark scale
@@ -290,13 +296,13 @@ function bark(f) {
          3.5 * Math.atan(Math.pow(f/7500, 2));
 }
 
-// ------------------------------
+/* // ------------------------------
 // Loudness (sone) + Sharpness (acum)
 // ------------------------------
 function calcLoudnessSharpness(barkEnergy) {
   const barkDB = barkEnergy.map(v => 10 * Math.log10(v + 1e-12));
 
-  const Nspec = barkDB.map(L => Math.pow(Math.max(0, L - 30), 0.23));
+  const Nspec = barkDB.map(L => Math.pow(Math.max(0, L - 40), 0.23));
 
   const loudness = Nspec.reduce((a,b)=>a+b, 0);
 
@@ -309,4 +315,90 @@ function calcLoudnessSharpness(barkEnergy) {
   const sharpness = num / den;
 
   return { loudness, sharpness };
+} */
+
+// ------------------------------
+// Loudness, Sharpness (new)
+// ------------------------------
+// 1. 定数定義
+const CENTER_FREQUENCIES = [
+    25, 31.5, 40, 50, 63, 80, 100, 125, 160, 200, 250, 315, 400, 500, 630, 800, 
+    1000, 1250, 1600, 2000, 2500, 3150, 4000, 5000, 6300, 8000, 10000, 12500
+];
+// 等感度補正 a_i (dB)
+const A_CORRECTION = [-17,-14,-11,-9,-7,-5,-4,-3,-2,-1,0,0,0,0,0,0,0,0.5,1,2,3,4,4,3,1,0,-2,-5];
+// 周波数(Hz)からBarkスケールへの変換関数
+function hzToBark(f) {
+    return 13 * Math.atan(0.00076 * f) + 3.5 * Math.atan(Math.pow(f / 7500, 2));
+}
+/**
+ * AnalyserNodeから音響パラメータを計算する
+ */
+function calculateAcousticParameters(analyser) {
+    const bufferLength = analyser.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+    analyser.getByteFrequencyData(dataArray); // FFT結果(dB)を取得
+
+    const sampleRate = analyser.context.sampleRate;
+    const binHz = sampleRate / (bufferLength * 2);
+
+    let bandsEnergy = new Array(28).fill(0);
+
+    // --- STEP 1: FFTビンを1/3オクターブバンドに統合 ---
+    for (let i = 0; i < bufferLength; i++) {
+        let freq = i * binHz;
+        if (freq < 20) continue;
+
+        for (let j = 0; j < CENTER_FREQUENCIES.length; j++) {
+            let lower = CENTER_FREQUENCIES[j] / Math.pow(2, 1/6);
+            let upper = CENTER_FREQUENCIES[j] * Math.pow(2, 1/6);
+            if (freq >= lower && freq < upper) {
+                // dBをリニアなエネルギーに変換して加算
+                let db = (dataArray[i] / 255) * 100; // 100dBを最大値と仮定
+                bandsEnergy[j] += Math.pow(10, db / 10);
+                break;
+            }
+        }
+    }
+
+    // --- STEP 2: 比ラウドネス N' の計算 ---
+    let nSpec = new Array(28).fill(0);
+    for (let i = 0; i < 28; i++) {
+        if (bandsEnergy[i] > 0) {
+            let avgDb = 10 * Math.log10(bandsEnergy[i]);
+            let correctedLevel = avgDb + A_CORRECTION[i];
+            // 比ラウドネス (Zwicker近似式)
+            nSpec[i] = 0.063 * Math.pow(10, 0.023 * correctedLevel);
+        }
+    }
+
+    // --- STEP 3: マスキング処理 (高域スロープ) ---
+    const s = 0.85; 
+    for (let i = 1; i < 28; i++) {
+        if (nSpec[i] < nSpec[i - 1] * s) {
+            nSpec[i] = nSpec[i - 1] * s;
+        }
+    }
+
+    // --- STEP 4: 総ラウドネス (Loudness) の算出 ---
+    const totalSone = nSpec.reduce((sum, val) => sum + val, 0);
+
+    // --- STEP 5: シャープネス (Sharpness - Aures法) の算出 ---
+    let sharpness = 0;
+    if (totalSone > 0) {
+        let weightedSum = 0;
+        for (let i = 0; i < 28; i++) {
+            let z = hzToBark(CENTER_FREQUENCIES[i]);
+            // Auresの重み関数 g(z)
+            // 高域(zが大きい)ほど重くなる指数関数
+            let gz = 0.11 * z * (Math.exp(0.171 * z) / totalSone);
+            weightedSum += nSpec[i] * gz * 0.33; // 0.33は1/3 oct幅の調整
+        }
+        sharpness = weightedSum;
+    }
+
+    return {
+        loudness: totalSone, // 単位: sone
+        sharpness: sharpness // 単位: acum
+    };
 }
