@@ -23,11 +23,10 @@ resizeCanvas();
 // Start / Stop UI
 // ------------------------------
 document.getElementById("startStopBtn").onclick = async () => {
-  if (!running) startAudio();
+  if (!running) await startAudio();
   else stopAudio();
 };
 
-// キャリブレーション用
 document.getElementById("calibBtn").onclick = () => {
   document.getElementById("calibDialog").style.display = "block";
   document.getElementById("calibInput").value = calibOffset;
@@ -41,7 +40,15 @@ document.getElementById("calibCancel").onclick = () => {
 };
 
 async function startAudio() {
-  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  // ブラウザのセキュリティ制限により、ユーザー操作内で生成が必要
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  
+  // Pause状態ならResumeする
+  if (audioCtx.state === 'suspended') {
+    await audioCtx.resume();
+  }
   
   try {
     micStream = await navigator.mediaDevices.getUserMedia({
@@ -51,13 +58,15 @@ async function startAudio() {
     const src = audioCtx.createMediaStreamSource(micStream);
     analyser = audioCtx.createAnalyser();
     analyser.fftSize = 16384; 
+    analyser.smoothingTimeConstant = 0.4; // 描画を少し滑らかに
     src.connect(analyser);
 
     running = true;
     document.getElementById("startStopBtn").textContent = "Stop";
     requestAnimationFrame(updateLoop);
   } catch (e) {
-    alert("マイクへのアクセスが拒否されました");
+    console.error(e);
+    alert("マイクの使用を許可してください。");
   }
 }
 
@@ -79,17 +88,22 @@ function updateLoop() {
   const sampleRate = audioCtx.sampleRate;
   const results = calculateAcousticParameters(buffer, sampleRate);
   
-  // HTML要素への書き出し（IDをHTML側と合わせてください）
-  if(document.getElementById("dbaValue")) document.getElementById("dbaValue").textContent = results.dBA.toFixed(1);
-  if(document.getElementById("loudnessValue")) document.getElementById("loudnessValue").textContent = results.loudness.toFixed(2);
-  if(document.getElementById("sharpnessValue")) document.getElementById("sharpnessValue").textContent = results.sharpness.toFixed(2);
+  // 数値の表示更新 (ID名はHTML側に合わせて調整)
+  updateValue("dbaValue", results.dBA.toFixed(1));
+  updateValue("loudnessValue", results.loudness.toFixed(2));
+  updateValue("sharpnessValue", results.sharpness.toFixed(2));
 
   drawPSD(buffer, sampleRate);
   requestAnimationFrame(updateLoop);
 }
 
+function updateValue(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
+
 // ------------------------------
-// 音響計算ロジック
+// 音響計算ロジック (ANSI S3.4 / ISO 532 準拠)
 // ------------------------------
 function calculateAcousticParameters(buffer, sampleRate) {
   const binHz = sampleRate / (buffer.length * 2);
@@ -118,17 +132,17 @@ function calculateAcousticParameters(buffer, sampleRate) {
     }
   }
 
-  // ラウドネス計算
+  // ラウドネス計算 (Zwicker近似)
   let nSpec = new Array(CENTER_FREQUENCIES.length).fill(0);
   for (let i = 0; i < CENTER_FREQUENCIES.length; i++) {
-    if (bandsEnergy[i] > 0) {
-      let avgDb = 10 * Math.log10(bandsEnergy[i] + 1e-12);
+    if (bandsEnergy[i] > 1e-12) {
+      let avgDb = 10 * Math.log10(bandsEnergy[i]);
       let correctedLevel = avgDb + A_CORRECTION[i];
       nSpec[i] = 0.063 * Math.pow(10, 0.023 * correctedLevel);
     }
   }
 
-  // 高域スロープ (Zwicker風)
+  // 高域スロープ (マスキング効果)
   const s = 0.85;
   for (let i = 1; i < nSpec.length; i++) {
     nSpec[i] = Math.max(nSpec[i], nSpec[i - 1] * s);
@@ -168,7 +182,7 @@ function drawPSD(buffer, sampleRate) {
 
   const binHz = sampleRate / (buffer.length * 2);
   ctx.strokeStyle = "#00FF00";
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 1.5;
   ctx.beginPath();
 
   let first = true;
@@ -188,26 +202,24 @@ function freqToX(f, W) { return W * (Math.log10(f) - Math.log10(20)) / (Math.log
 function dBToY(dB, H) { return H * (100 - dB) / 100; }
 
 function drawGrid(W, H) {
-  const freqs = [20, 100, 1000, 10000, 20000];
-  ctx.font = "12px Arial";
+  ctx.strokeStyle = "#222";
+  ctx.fillStyle = "#666";
+  ctx.font = "10px Arial";
+  
+  const freqs = [20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000];
   for (const f of freqs) {
     const x = freqToX(f, W);
-    ctx.strokeStyle = "#333";
     ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
-    ctx.fillStyle = "#888";
     ctx.fillText(f >= 1000 ? (f/1000)+"k" : f, x + 2, H - 5);
   }
+  
   for (let d = 0; d <= 100; d += 20) {
     const y = dBToY(d, H);
-    ctx.strokeStyle = "#333";
     ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
     ctx.fillText(d + "dB", 5, y - 5);
   }
 }
 
-// ------------------------------
-// 共通計算関数
-// ------------------------------
 function Aweight(f) {
   const f2 = f*f;
   const num = 12200*12200 * f2*f2;
