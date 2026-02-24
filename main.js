@@ -1,12 +1,11 @@
 let audioCtx, analyser, micStream;
 let running = false;
 let calibOffset = 110;
-let lastBuffer = null;
 
 const canvas = document.getElementById("psdCanvas");
 const ctx = canvas.getContext("2d");
 
-// 1/3オクターブバンドの中心周波数と補正値
+// 1/3オクターブバンドの設定
 const CENTER_FREQUENCIES = [
   25, 31.5, 40, 50, 63, 80, 100, 125, 160, 200, 250, 315, 400, 500, 630, 800, 
   1000, 1250, 1600, 2000, 2500, 3150, 4000, 5000, 6300, 8000, 10000, 12500
@@ -21,23 +20,22 @@ window.addEventListener("resize", resizeCanvas);
 resizeCanvas();
 
 // ------------------------------
-// Start / Stop
+// Start / Stop UI
 // ------------------------------
 document.getElementById("startStopBtn").onclick = async () => {
   if (!running) startAudio();
   else stopAudio();
 };
 
+// キャリブレーション用
 document.getElementById("calibBtn").onclick = () => {
   document.getElementById("calibDialog").style.display = "block";
   document.getElementById("calibInput").value = calibOffset;
 };
-
 document.getElementById("calibOk").onclick = () => {
   calibOffset = parseFloat(document.getElementById("calibInput").value);
   document.getElementById("calibDialog").style.display = "none";
 };
-
 document.getElementById("calibCancel").onclick = () => {
   document.getElementById("calibDialog").style.display = "none";
 };
@@ -47,11 +45,7 @@ async function startAudio() {
   
   try {
     micStream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: false,
-        noiseSuppression: false,
-        autoGainControl: false
-      }
+      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
     });
 
     const src = audioCtx.createMediaStreamSource(micStream);
@@ -63,7 +57,7 @@ async function startAudio() {
     document.getElementById("startStopBtn").textContent = "Stop";
     requestAnimationFrame(updateLoop);
   } catch (e) {
-    console.error("Microphone access denied", e);
+    alert("マイクへのアクセスが拒否されました");
   }
 }
 
@@ -74,7 +68,7 @@ function stopAudio() {
 }
 
 // ------------------------------
-// Main Loop
+// 描画と計算のメインループ
 // ------------------------------
 function updateLoop() {
   if (!running) return;
@@ -82,22 +76,20 @@ function updateLoop() {
   const buffer = new Float32Array(analyser.frequencyBinCount);
   analyser.getFloatFrequencyData(buffer);
   
-  // 各種パラメータ計算
-  const results = calculateAcousticParameters(buffer, analyser.context.sampleRate);
+  const sampleRate = audioCtx.sampleRate;
+  const results = calculateAcousticParameters(buffer, sampleRate);
   
-  // UI更新
-  document.getElementById("dbaValue").textContent = results.dBA.toFixed(1);
-  document.getElementById("LoudnessValue").textContent = results.loudness.toFixed(2);
-  document.getElementById("sharpnessValue").textContent = results.sharpness.toFixed(2);
+  // HTML要素への書き出し（IDをHTML側と合わせてください）
+  if(document.getElementById("dbaValue")) document.getElementById("dbaValue").textContent = results.dBA.toFixed(1);
+  if(document.getElementById("loudnessValue")) document.getElementById("loudnessValue").textContent = results.loudness.toFixed(2);
+  if(document.getElementById("sharpnessValue")) document.getElementById("sharpnessValue").textContent = results.sharpness.toFixed(2);
 
-  // 描画
-  drawPSD(buffer, analyser.context.sampleRate);
-  
+  drawPSD(buffer, sampleRate);
   requestAnimationFrame(updateLoop);
 }
 
 // ------------------------------
-// Acoustic Calculation
+// 音響計算ロジック
 // ------------------------------
 function calculateAcousticParameters(buffer, sampleRate) {
   const binHz = sampleRate / (buffer.length * 2);
@@ -111,7 +103,7 @@ function calculateAcousticParameters(buffer, sampleRate) {
     let dbRaw = buffer[i] + calibOffset;
     let energy = Math.pow(10, dbRaw / 10);
 
-    // dBA計算用
+    // dBA計算
     let dbA = dbRaw + Aweight(freq);
     totalEnergyA += Math.pow(10, dbA / 10);
 
@@ -126,18 +118,17 @@ function calculateAcousticParameters(buffer, sampleRate) {
     }
   }
 
-  // 比ラウドネスとマスキング
+  // ラウドネス計算
   let nSpec = new Array(CENTER_FREQUENCIES.length).fill(0);
   for (let i = 0; i < CENTER_FREQUENCIES.length; i++) {
     if (bandsEnergy[i] > 0) {
-      let avgDb = 10 * Math.log10(bandsEnergy[i]);
+      let avgDb = 10 * Math.log10(bandsEnergy[i] + 1e-12);
       let correctedLevel = avgDb + A_CORRECTION[i];
-      // Zwicker簡略式
       nSpec[i] = 0.063 * Math.pow(10, 0.023 * correctedLevel);
     }
   }
 
-  // 高域スロープ処理
+  // 高域スロープ (Zwicker風)
   const s = 0.85;
   for (let i = 1; i < nSpec.length; i++) {
     nSpec[i] = Math.max(nSpec[i], nSpec[i - 1] * s);
@@ -165,13 +156,14 @@ function calculateAcousticParameters(buffer, sampleRate) {
 }
 
 // ------------------------------
-// Drawing & Utils
+// 描画関連
 // ------------------------------
 function drawPSD(buffer, sampleRate) {
   const W = canvas.width;
   const H = canvas.height;
   ctx.fillStyle = "black";
   ctx.fillRect(0, 0, W, H);
+
   drawGrid(W, H);
 
   const binHz = sampleRate / (buffer.length * 2);
@@ -193,14 +185,29 @@ function drawPSD(buffer, sampleRate) {
 }
 
 function freqToX(f, W) { return W * (Math.log10(f) - Math.log10(20)) / (Math.log10(20000) - Math.log10(20)); }
-function dBToY(dB, H) { return H * (100 - dB) / 100; } // 表示レンジを0-100dBに調整
+function dBToY(dB, H) { return H * (100 - dB) / 100; }
 
 function drawGrid(W, H) {
-  ctx.strokeStyle = "#333";
-  // 周波数グリッドとdBグリッドの描画 (省略せず既存のdrawGridロジックを維持)
-  // ... (既存のdrawGridの内容をここに)
+  const freqs = [20, 100, 1000, 10000, 20000];
+  ctx.font = "12px Arial";
+  for (const f of freqs) {
+    const x = freqToX(f, W);
+    ctx.strokeStyle = "#333";
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+    ctx.fillStyle = "#888";
+    ctx.fillText(f >= 1000 ? (f/1000)+"k" : f, x + 2, H - 5);
+  }
+  for (let d = 0; d <= 100; d += 20) {
+    const y = dBToY(d, H);
+    ctx.strokeStyle = "#333";
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    ctx.fillText(d + "dB", 5, y - 5);
+  }
 }
 
+// ------------------------------
+// 共通計算関数
+// ------------------------------
 function Aweight(f) {
   const f2 = f*f;
   const num = 12200*12200 * f2*f2;
