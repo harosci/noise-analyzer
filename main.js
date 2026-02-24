@@ -101,14 +101,14 @@ async function startAudio() {
   const src = audioCtx.createMediaStreamSource(micStream);
 
   analyser = audioCtx.createAnalyser();
-  analyser.fftSize = 32768;   // ★高分解能
+  analyser.fftSize = 16384;   // 分解能
 
   src.connect(analyser);
 
   running = true;
   document.getElementById("startStopBtn").textContent = "Stop";
 
-  drawTimer = setInterval(drawPSD, 33);  // ★33ms更新
+  drawTimer = setInterval(drawPSD, 100);  // 更新
 }
 
 // ------------------------------
